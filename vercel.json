@@ -1,9 +1,9 @@
 {
-  "routes": [
-    { "handle": "filesystem" },
+  "rewrites": [
     {
-      "src": "/.*",
-      "dest": "/index.html"
-    }
+      "source": "/api/(.*)",
+      "destination": "http://3.36.213.198:8080/api/$1"
+    },
+    { "source": "/(.*)", "destination": "/" }
   ]
 }
