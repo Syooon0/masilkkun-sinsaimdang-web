@@ -3,6 +3,7 @@ import "./MyPage.css";
 import { FaHeart, FaBookmark } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import baseApi from "../api/baseApi";
+import default_profile from "../../public/default_profile.png";
 
 export default function MyPage() {
   const navigate = useNavigate();
@@ -70,7 +71,6 @@ export default function MyPage() {
 
         // 사용자 게시글 로드
         try {
-
           let myPostsResponse;
           try {
             // 1차 시도: 작성한 게시글 API
@@ -560,11 +560,7 @@ export default function MyPage() {
       <section className="myp-header">
         <img
           className="myp-avatar-lg"
-          src={
-            user?.profileImageUrl ||
-            "https://www.studiopeople.kr/common/img/default_profile.png"
-          }
-          alt="프로필"
+          src={user?.profileImageUrl || "./default_profile.png"}
           style={{
             width: "120px",
             height: "120px",
@@ -621,16 +617,16 @@ export default function MyPage() {
           <div className="myp-no-posts">게시글이 없습니다.</div>
         ) : (
           posts.map((post) => {
-            const dateStr = post?.createdAt
-              ? new Date(post.createdAt).toString() !== "Invalid Date"
+            const dateStr =
+              post?.createdAt &&
+              new Date(post.createdAt).toString() !== "Invalid Date"
                 ? new Date(post.createdAt).toLocaleDateString("ko-KR")
-                : ""
-              : "";
+                : "";
 
             return (
               <div
                 key={post.id}
-                className={`myp-card ${isDeleteMode ? "delete-mode" : ""} ${
+                className={`post-card ${isDeleteMode ? "delete-mode" : ""} ${
                   selectedPosts.has(post.id) ? "selected" : ""
                 }`}
                 onClick={
@@ -649,79 +645,95 @@ export default function MyPage() {
                 )}
 
                 {/* 이미지 섹션 */}
-                <div className="myp-card-images">
-                  <img
-                    src={post.places?.[0]?.photoUrl}
-                    alt={`${post.title} 이미지 1`}
-                    className="myp-card-image"
-                  />
-                  <img
-                    src={post.places?.[1]?.photoUrl}
-                    alt={`${post.title} 이미지 2`}
-                    className="myp-card-image"
-                  />
+                <div
+                  className={`myp-card-images ${
+                    post.places?.length === 1 ? "single-image" : ""
+                  }`}
+                >
+                  {post.places?.map((place, idx) => (
+                    <img
+                      key={idx}
+                      src={place.photoUrl}
+                      alt={`${post.title} 이미지 ${idx + 1}`}
+                      className="myp-card-image"
+                    />
+                  ))}
                 </div>
 
                 {/* 내용 섹션 */}
-                <div className="myp-card-content">
-                  <div className="myp-card-header">
+                <div className="myp-card-content post-content">
+                  <div className="profile-date-section">
                     <img
                       src={
                         post?.author?.profileImage ||
                         user?.profileImageUrl ||
-                        "https://www.studiopeople.kr/common/img/default_profile.png"
+                        "/default-profile.png"
                       }
-                      alt={post?.author?.nickname || "작성자"}
-                      className="myp-card-avatar"
-                      style={{
-                        width: "40px",
-                        height: "40px",
-                        borderRadius: "50%",
-                        objectFit: "cover",
-                        objectPosition: "center",
+                      alt={`${post?.author?.nickname || "익명"} 프로필`}
+                      className="profile-img"
+                      onClick={() => handleUserProfileClick(post?.author?.id)}
+                      onError={(e) => {
+                        e.target.src = "/default-profile.png";
                       }}
+                      style={{ cursor: "pointer" }}
                     />
-                    <div className="myp-card-info">
-                      <div className="myp-meta">
-                        {post?.author?.nickname || user?.nickname}
-                        {dateStr && ` • ${dateStr}`}
-                      </div>
-                      <h3 className="myp-title">{post.title}</h3>
+                    <p className="post-date">
+                      {post?.author?.nickname || "익명"} • {dateStr || ""}
+                    </p>
+                  </div>
 
-                      <div className="myp-tags">
-                        {Array.isArray(post?.tags) &&
-                          post.tags.slice(0, 2).map((tag, idx) => (
-                            <span key={idx} className="myp-tag">
-                              #
-                              {tag === "TRAVEL"
-                                ? "여행지"
-                                : tag === "RESTAURANT"
-                                ? "맛집"
-                                : tag === "CAFE"
-                                ? "카페"
-                                : tag}
-                            </span>
-                          ))}
-                      </div>
+                  <h3 className="post-title" title={post.title || "제목 없음"}>
+                    {post.title || "제목 없음"}
+                  </h3>
 
-                      <div className="myp-actions">
-                        <div className="myp-pill">
-                          <FaBookmark className="myp-icon" />
-                          <span>
-                            {post?.scrapCount >= 1000
-                              ? `${(post.scrapCount / 1000).toFixed(1)}K`
-                              : post?.scrapCount ?? 0}
-                          </span>
-                        </div>
-                        <div className="myp-pill">
-                          <FaHeart className="myp-icon" />
-                          <span>
-                            {post?.likeCount >= 1000
-                              ? `${(post.likeCount / 1000).toFixed(1)}K`
-                              : post?.likeCount ?? 0}
-                          </span>
-                        </div>
-                      </div>
+                  <div className="post-tags">
+                    {Array.isArray(post?.tags) &&
+                      post.tags.slice(0, 2).map((tag, idx) => (
+                        <span key={idx} className="tag" title={`#${tag}`}>
+                          #
+                          {tag === "TRAVEL"
+                            ? "여행지"
+                            : tag === "RESTAURANT"
+                            ? "맛집"
+                            : tag === "CAFE"
+                            ? "카페"
+                            : tag}
+                        </span>
+                      ))}
+                    <div className="post-actions">
+                      <button
+                        className={`action-btn bookmark-btn ${
+                          post?.isScraped ? "active" : ""
+                        }`}
+                        onClick={() => toggleBookmark(post.id)}
+                        aria-label={`북마크 ${
+                          post?.isScraped ? "해제" : "추가"
+                        }`}
+                        title={`북마크 ${post?.isScraped ? "해제" : "추가"}`}
+                      >
+                        <FaBookmark />
+                        <span>
+                          {post?.scrapCount >= 1000
+                            ? `${(post.scrapCount / 1000).toFixed(1)}K`
+                            : post?.scrapCount ?? 0}
+                        </span>
+                      </button>
+
+                      <button
+                        className={`action-btn like-btn ${
+                          post?.isLiked ? "active" : ""
+                        }`}
+                        onClick={() => toggleLike(post.id)}
+                        aria-label={`좋아요 ${post?.isLiked ? "해제" : "추가"}`}
+                        title={`좋아요 ${post?.isLiked ? "해제" : "추가"}`}
+                      >
+                        <FaHeart />
+                        <span>
+                          {post?.likeCount >= 1000
+                            ? `${(post.likeCount / 1000).toFixed(1)}K`
+                            : post?.likeCount ?? 0}
+                        </span>
+                      </button>
                     </div>
                   </div>
                 </div>

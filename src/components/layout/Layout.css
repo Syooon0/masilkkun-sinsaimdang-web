@@ -1,7 +1,7 @@
 .layout-container {
   display: flex;
   width: 100vw;
-  height: 100vh;
+  height: auto;
   margin: 0;
   padding: 0;
 }
@@ -23,9 +23,16 @@
 }
 
 .content-wrapper {
+  width: 100%;
   display: flex;
   flex: 1;
   overflow-y: auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.content-wrapper::-webkit-scrollbar {
+  display: none;
 }
 
 .left-section {
@@ -45,4 +52,10 @@
   flex-direction: column;
   background-color: #f9f9f9;
   position: relative;
+}
+
+.layout-post-list-page {
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
 }

@@ -64,26 +64,28 @@ const PostListPage = ({ sortOrder, setSortOrder }) => {
 
   return (
     <div className="post-list-page">
-      <div className="top-bar">
-        <Region region={region} setRegion={setRegion} />
+      <div className="list-top">
+        <div className="top-bar">
+          <Region region={region} setRegion={setRegion} />
+        </div>
+        <div>
+          <div className="filter-bar">
+            <CategoryFilter
+              selectedCategories={selectedTags}
+              onCategoryChange={setSelectedTags}
+            />
+
+            <select
+              className="sort-select"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+            >
+              <option value="기본순">기본순</option>
+              <option value="좋아요순">좋아요순</option>
+            </select>
+          </div>
+        </div>
       </div>
-
-      <div className="filter-bar">
-        <CategoryFilter
-          selectedCategories={selectedTags}
-          onCategoryChange={setSelectedTags}
-        />
-
-        <select
-          className="sort-select"
-          value={sortOrder}
-          onChange={(e) => setSortOrder(e.target.value)}
-        >
-          <option value="기본순">기본순</option>
-          <option value="좋아요순">좋아요순</option>
-        </select>
-      </div>
-
       {loading ? (
         <div className="loading-container">
           <p>게시글을 불러오는 중...</p>

@@ -2,7 +2,7 @@
 import axios from "axios";
 
 const baseApi = axios.create({
-  baseURL: "/api",
+  baseURL: import.meta.env.VITE_API_URL,
   withCredentials: true, // refresh 토큰이 httpOnly 쿠키에 있을 경우 필요
 });
 

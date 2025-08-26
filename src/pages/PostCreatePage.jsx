@@ -1,118 +1,227 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./PostCreatePage.css";
 import baseApi from "../api/baseApi";
 
 const PostCreatePage = ({ mapRef }) => {
   const [title, setTitle] = useState("");
-  const [region, setRegion] = useState("");
   const [tags, setTags] = useState([]);
   const [places, setPlaces] = useState([
-    { placeName: "", address: null, image: null, description: "" },
+    {
+      placeName: "",
+      address: null,
+      roadAddress: null,
+      image: null,
+      description: "",
+    },
   ]);
   const [activePlaceIndex, setActivePlaceIndex] = useState(null);
+  const geocoderRef = useRef(null);
   const navigate = useNavigate();
-  const tagOptions = ["여행지", "맛집", "카페"];
+  const tagOptions = [
+    { label: "여행지", value: "TRAVEL_SPOT" },
+    { label: "맛집", value: "RESTAURANT" },
+    { label: "카페", value: "CAFE" },
+  ];
+  const regionMap = {
+    서울: "서울특별시",
+    부산: "부산광역시",
+    대구: "대구광역시",
+    인천: "인천광역시",
+    광주: "광주광역시",
+    대전: "대전광역시",
+    울산: "울산광역시",
+    세종: "세종특별자치시",
+    경기: "경기도",
+    강원: "강원특별자치도",
+    충북: "충청북도",
+    충남: "충청남도",
+    전북: "전북특별자치도",
+    전남: "전라남도",
+    경북: "경상북도",
+    경남: "경상남도",
+    제주: "제주특별자치도",
+  };
 
+  // tempPost 불러오기
   useEffect(() => {
-    const tempPost = localStorage.getItem("tempPost");
-    if (tempPost) {
-      const parsed = JSON.parse(tempPost);
-      setTitle(parsed.title || "");
-      setRegion(parsed.region || "");
-      setTags(parsed.tags || []);
-      setPlaces(
-        parsed.places || [
-          { placeName: "", address: null, image: null, description: "" },
-        ]
-      );
-    }
-  }, []);
+    setTitle("");
+  }, []); // 빈 배열이면 컴포넌트 마운트 시 한 번만 실행
+  // Kakao Geocoder 초기화
+  const initGeocoder = () => {
+    return new Promise((resolve, reject) => {
+      if (geocoderRef.current) return resolve(geocoderRef.current);
+      const check = setInterval(() => {
+        if (window.kakao && window.kakao.maps && window.kakao.maps.services) {
+          geocoderRef.current = new window.kakao.maps.services.Geocoder();
+          clearInterval(check);
+          resolve(geocoderRef.current);
+        }
+      }, 100);
+      setTimeout(() => {
+        clearInterval(check);
+        reject(new Error("Kakao Maps 스크립트 로딩 실패"));
+      }, 5000);
+    });
+  };
 
+  // 좌표 → 주소 변환
+  const coordsToAddress = async (lat, lng) => {
+    await initGeocoder();
+    return new Promise((resolve, reject) => {
+      geocoderRef.current.coord2Address(lng, lat, (result, status) => {
+        if (
+          status === window.kakao.maps.services.Status.OK &&
+          result.length > 0
+        ) {
+          const roadAddress = result[0].road_address;
+          const jibunAddress = result[0].address;
+          const address = roadAddress || jibunAddress;
+          if (!address)
+            return reject(new Error("주소 정보를 찾을 수 없습니다."));
+
+          const regionMap = {
+            서울: "서울특별시",
+            경기: "경기도",
+            부산: "부산광역시",
+            대구: "대구광역시",
+            인천: "인천광역시",
+            광주: "광주광역시",
+            대전: "대전광역시",
+            울산: "울산광역시",
+            세종: "세종특별자치시",
+            강원: "강원특별자치도",
+            충북: "충청북도",
+            충남: "충청남도",
+            전북: "전북특별자치도",
+            전남: "전라남도",
+            경북: "경상북도",
+            경남: "경상남도",
+            제주: "제주특별자치도",
+          };
+
+          resolve({
+            address_name: address.address_name,
+            region_1depth_name:
+              regionMap[address.region_1depth_name] ||
+              address.region_1depth_name,
+            region_2depth_name: address.region_2depth_name,
+          });
+        } else {
+          reject(
+            new Error("주소 변환에 실패했습니다. (해당 좌표에 주소 없음)")
+          );
+        }
+      });
+    });
+  };
+
+  // 태그 선택 토글
   const toggleTag = (tag) => {
-    setTags(
-      tags.includes(tag) ? tags.filter((t) => t !== tag) : [...tags, tag]
+    setTags((prev) =>
+      prev.some((t) => t.value === tag.value)
+        ? prev.filter((t) => t.value !== tag.value)
+        : [...prev, tag]
     );
   };
 
+  // 이미지 업로드
   const handleImageUpload = (index, e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      alert("파일 크기는 5MB 이하만 업로드 가능합니다.");
-      return;
-    }
+    if (file.size > 5 * 1024 * 1024)
+      return alert("파일 크기는 5MB 이하만 가능합니다.");
     const updated = [...places];
     updated[index].image = URL.createObjectURL(file);
     updated[index].imageFile = file;
     setPlaces(updated);
   };
 
+  // 장소 이름 / 설명 변경
+  const handlePlaceNameChange = (index, value) => {
+    const updated = [...places];
+    updated[index].placeName = value;
+    setPlaces(updated);
+  };
   const handleDescriptionChange = (index, value) => {
     const updated = [...places];
     updated[index].description = value;
     setPlaces(updated);
   };
 
-  const handlePlaceNameChange = (index, value) => {
-    const updated = [...places];
-    updated[index].placeName = value;
-    setPlaces(updated);
-  };
-
-  const handleAddPlace = () => {
+  // 장소 추가/삭제
+  const handleAddPlace = () =>
     setPlaces([
       ...places,
-      { placeName: "", address: null, image: null, description: "" },
+      {
+        placeName: "",
+        address: null,
+        roadAddress: null,
+        image: null,
+        description: "",
+      },
     ]);
-  };
+  const handleRemovePlace = (index) =>
+    places.length > 1 && setPlaces(places.filter((_, i) => i !== index));
 
-  const handleRemovePlace = (index) => {
-    if (places.length > 1) setPlaces(places.filter((_, i) => i !== index));
-  };
-
+  // 임시저장
   const handleTempSave = () => {
-    localStorage.setItem(
-      "tempPost",
-      JSON.stringify({ title, region, tags, places })
-    );
+    localStorage.setItem("tempPost", JSON.stringify({ title, tags, places }));
     alert("임시 저장되었습니다!");
   };
 
+  // 폼 유효성 체크
   const validateForm = () => {
-    if (!title.trim()) {
-      alert("제목을 입력해주세요.");
-      return false;
-    }
-    if (tags.length === 0) {
-      alert("최소 하나의 태그를 선택해주세요.");
-      return false;
-    }
-    if (places.some((p) => !p.placeName.trim())) {
-      alert("모든 장소의 이름을 입력해주세요.");
-      return false;
-    }
+    if (!title.trim()) return alert("제목을 입력해주세요."), false;
+    if (tags.length === 0)
+      return alert("최소 하나의 태그를 선택해주세요."), false;
+    if (places.some((p) => !p.placeName.trim()))
+      return alert("모든 장소의 이름을 입력해주세요."), false;
     return true;
   };
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
-    const postData = {
-      title,
-      content: places.map((p) => p.description).join("\n\n"),
-      tags,
-      places: places.map((p, i) => ({
-        placeOrder: i + 1,
-        placeName: p.placeName,
-        description: p.description,
-        photoUrl: p.image || null,
-        roadAddress: p.address || null,
-      })),
-    };
 
     try {
-      await baseApi.post("/articles", postData);
-      localStorage.removeItem("tempPost");
+      const postData = {
+        title,
+        content: places.map((p) => p.description).join("\n\n"),
+        tags: tags.map((t) => t.value || t),
+        places: places.map((p, i) => ({
+          placeOrder: i + 1,
+          placeName: p.placeName,
+          description: p.description,
+          roadAddress: p.roadAddress || {
+            address_name: "",
+            region_1depth_name: "",
+            region_2depth_name: "",
+          },
+        })),
+      };
+
+      const token = localStorage.getItem("accessToken");
+
+      // ✅ FormData 생성
+      const formData = new FormData();
+      formData.append(
+        "request",
+        new Blob([JSON.stringify(postData)], { type: "application/json" })
+      );
+
+      places.forEach((p) => {
+        if (p.imageFile) {
+          formData.append("images", p.imageFile);
+        }
+      });
+
+      // ✅ Content-Type 지정하지 말 것!
+      await baseApi.post("/articles", formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
       alert("게시글이 성공적으로 등록되었습니다!");
       navigate("/");
     } catch (error) {
@@ -126,44 +235,61 @@ const PostCreatePage = ({ mapRef }) => {
     if (mapRef.current) {
       mapRef.current.openSearch();
       mapRef.current.setOnSelectPlace((place) => {
-        const updated = [...places];
-        updated[index] = {
-          ...updated[index],
-          placeName: place.placeName,
-          address: place.address,
-        };
-        setPlaces(updated);
+        try {
+          if (!place.placeName || !place.address) {
+            throw new Error("선택한 장소에 주소 정보가 없습니다.");
+          }
+
+          const [region1, region2, ...rest] = place.address.split(" ");
+
+          const updated = [...places];
+          updated[index] = {
+            ...updated[index],
+            placeName: place.placeName,
+            address: place.address, // 화면 표시용
+            roadAddress: {
+              address_name: place.address,
+              region_1depth_name: regionMap[region1] || region1,
+              region_2depth_name: region2 || "",
+            },
+          };
+          setPlaces(updated);
+        } catch (err) {
+          console.error("주소 처리 실패:", err);
+          alert(err.message);
+        }
       });
     }
   };
 
   return (
     <div className="post-create-container">
-      <div className="post-create-content">
-        <input
-          type="text"
-          placeholder="제목을 입력해주세요."
-          className="post-create-title-input"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          maxLength={100}
-        />
+      <div className="create-top">
+        <div className="post-create-content">
+          <input
+            type="text"
+            placeholder="제목을 입력해주세요."
+            className="post-create-title-input"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={100}
+          />
 
-        <div className="tag-select-container">
-          {tagOptions.map((tag) => (
-            <button
-              key={tag}
-              className={`tag-select-chip ${
-                tags.includes(tag) ? "selected" : ""
-              }`}
-              onClick={() => toggleTag(tag)}
-              type="button"
-            >
-              {tag}
-            </button>
-          ))}
+          <div className="tag-select-container">
+            {tagOptions.map((tag) => (
+              <button
+                key={tag.value}
+                className={`tag-select-chip ${
+                  tags.some((t) => t.value === tag.value) ? "selected" : ""
+                }`}
+                onClick={() => toggleTag(tag)}
+                type="button"
+              >
+                {tag.label}
+              </button>
+            ))}
+          </div>
         </div>
-
         {places.map((place, index) => (
           <div className="place-section" key={index}>
             <div className="place-header">
@@ -180,14 +306,16 @@ const PostCreatePage = ({ mapRef }) => {
               )}
             </div>
 
-            <input
+            <div
               type="text"
               placeholder="장소 이름"
               className="place-name-input"
               value={place.placeName}
               onChange={(e) => handlePlaceNameChange(index, e.target.value)}
-              maxLength={50}
-            />
+            >
+              {" "}
+              장소 : {place.placeName}
+            </div>
 
             <button
               className="location-select-btn"
@@ -198,9 +326,7 @@ const PostCreatePage = ({ mapRef }) => {
             </button>
 
             {place.address && (
-              <div className="selected-address">
-                주소: {place.address} <br />
-              </div>
+              <div className="selected-address">주소: {place.address}</div>
             )}
 
             <div className="image-upload-section">
