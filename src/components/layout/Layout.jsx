@@ -18,41 +18,42 @@ const Layout = () => {
     switch (activePage) {
       case "작성":
         return (
-          <div className="post-list-page">
-            <div className="top-bar">
-              <Region
-                type="text"
-                className="search-input"
-                placeholder="지역을 선택해주세요."
-                value={region}
-                onChange={(e) => setRegion(e.target.value)}
-              />
-            </div>
-
-            <div className="filter-bar">
-              <div className="category-btns">
-                {["여행지", "맛집", "카페"].map((cat) => (
-                  <button
-                    key={cat}
-                    className={`category-btn ${
-                      selectedCategory === cat ? "active" : ""
-                    }`}
-                    onClick={() => setSelectedCategory(cat)}
-                  >
-                    {cat}
-                  </button>
-                ))}
+          <div className="layout-post-list-page">
+            <div className="list-top">
+              <div className="top-bar">
+                <Region
+                  type="text"
+                  className="search-input"
+                  placeholder="지역을 선택해주세요."
+                  value={region}
+                  onChange={(e) => setRegion(e.target.value)}
+                />
               </div>
-              <select
-                className="sort-select"
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value)}
-              >
-                <option value="기본순">기본순</option>
-                <option value="좋아요순">좋아요순</option>
-              </select>
-            </div>
 
+              <div className="filter-bar">
+                <div className="category-btns">
+                  {["여행지", "맛집", "카페"].map((cat) => (
+                    <button
+                      key={cat}
+                      className={`category-btn ${
+                        selectedCategory === cat ? "active" : ""
+                      }`}
+                      onClick={() => setSelectedCategory(cat)}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+                <select
+                  className="sort-select"
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value)}
+                >
+                  <option value="기본순">기본순</option>
+                  <option value="좋아요순">좋아요순</option>
+                </select>
+              </div>
+            </div>
             <PostList
               region={region}
               category={selectedCategory}

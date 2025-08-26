@@ -147,7 +147,7 @@ const Register = ({ onSwitch, onRegisterSuccess }) => {
         >
           <img src={RegisterComplete} className="logo" />
           <h3 style={{ fontSize: "1.8rem", color: "#9a7937", margin: 0 }}>
-            🎉🎉 회원가입 완료! 🎉🎉
+            🎉 회원가입 완료! 🎉
           </h3>
           <p style={{ fontSize: "1rem", color: "#9a7937", margin: 0 }}>
             이제 로그인하여 서비스를 이용할 수 있습니다.

@@ -118,6 +118,9 @@ const Sidebar = ({ isLoggedIn, setIsLoggedIn, setIsLoginModalOpen }) => {
   }, []);
 
   const handleLogout = async () => {
+    const leave = window.confirm("정말 로그아웃 하시겠습니까?");
+    if (!leave) return;
+
     try {
       if (user?.email) {
         await baseApi.post(
@@ -146,6 +149,14 @@ const Sidebar = ({ isLoggedIn, setIsLoggedIn, setIsLoginModalOpen }) => {
       setIsLoginModalOpen(true);
       return;
     }
+    const leavePages = ["/create", "/edit"]; // 필요에 따라 수정 페이지 경로 추가
+    if (leavePages.includes(location.pathname)) {
+      const leave = window.confirm(
+        "작성 중인 페이지를 벗어나면 저장되지 않은 내용이 사라집니다. 정말 나가시겠습니까?"
+      );
+      if (!leave) return;
+    }
+
     navigate(path);
   };
 

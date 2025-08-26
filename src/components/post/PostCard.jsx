@@ -292,7 +292,11 @@ const PostCard = ({ post, onPatch }) => {
     <div className="post-card" onClick={handleCardClick}>
       {/* 상단 이미지 섹션 */}
       <div className="post-header">
-        <div className="post-images">
+        <div
+          className={`post-images ${
+            post.places?.length === 1 ? "single-image" : ""
+          }`}
+        >
           <img
             src={post.places?.[0]?.photoUrl || "/default-image.png"}
             alt={post.title || "게시글 이미지"}
@@ -308,7 +312,7 @@ const PostCard = ({ post, onPatch }) => {
               onError={handleImageError}
               loading="lazy"
             />
-          ) : (
+          ) : post.places?.length === 1 ? null : (
             <div className="sub-image-placeholder" />
           )}
         </div>

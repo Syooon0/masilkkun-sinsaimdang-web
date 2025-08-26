@@ -6,7 +6,7 @@
   border-radius: 16px;
   overflow: hidden;
   background-color: white;
-  width: 284px;
+  width: 100%;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   transition: all 0.3s ease;
   cursor: pointer;
@@ -24,7 +24,6 @@
 /* 상단 이미지 섹션 */
 .post-header {
   display: flex !important;
-  padding: 16px 16px 4px 16px; /* 하단 패딩 더 줄임: 8px → 4px */
   gap: 4px;
   align-items: center;
 }
@@ -34,11 +33,16 @@
   display: flex !important;
   flex-direction: row !important;
   gap: 4px;
-  height: 200px;
+  height: 150px;
 }
 
+.post-images.single-image .main-image {
+  flex: 1;
+  height: 150px; /* 두 장 배치 높이와 동일 */
+  object-fit: cover;
+}
 .main-image {
-  width: 50% !important;
+  width: 48% !important;
   height: 100%;
   object-fit: cover;
   border-radius: 12px;
@@ -77,7 +81,7 @@
 
 /* 콘텐츠 섹션 */
 .post-content {
-  padding: 4px 16px 16px 16px; /* 상단 패딩 더 줄임: 8px → 4px */
+  padding: 10px; /* 상단 패딩 더 줄임: 8px → 4px */
   display: flex;
   flex-direction: column;
   gap: 8px; /* 간격 줄임: 10px → 8px */
