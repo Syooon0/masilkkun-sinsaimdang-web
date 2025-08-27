@@ -19,68 +19,76 @@ const ScrapbookPage = () => {
   };
 
   // 스크랩한 게시글 목록 조회
-  useEffect(() => {
-    const fetchScrapedPosts = async () => {
-      const token = sessionStorage.getItem("accessToken");
-      if (!token) {
-        console.log("로그인이 필요합니다.");
-        return;
-      }
 
-      try {
-        const regionMap = {
-          서울: "서울특별시",
-          부산: "부산광역시",
-          대구: "대구광역시",
-          인천: "인천광역시",
-          광주: "광주광역시",
-          대전: "대전광역시",
-          울산: "울산광역시",
-          세종: "세종특별자치시",
-          경기: "경기도",
-          강원: "강원특별자치도",
-          충북: "충청북도",
-          충남: "충청남도",
-          전북: "전북특별자치도",
-          전남: "전라남도",
-          경북: "경상북도",
-          경남: "경상남도",
-          제주: "제주특별자치도",
-        };
+  const fetchScrapedPosts = async () => {
+    const token = sessionStorage.getItem("accessToken");
+    if (!token) {
+      console.log("로그인이 필요합니다.");
+      return;
+    }
 
-        const regionQuery = region ? regionMap[region] : undefined;
-        // API 엔드포인트 수정 시도
-        const tagsQuery =
-          selectedTags.length > 0
-            ? selectedTags.map((t) => tagMap[t]).join(",")
-            : undefined;
+    try {
+      const regionMap = {
+        서울: "서울특별시",
+        부산: "부산광역시",
+        대구: "대구광역시",
+        인천: "인천광역시",
+        광주: "광주광역시",
+        대전: "대전광역시",
+        울산: "울산광역시",
+        세종: "세종특별자치시",
+        경기: "경기도",
+        강원: "강원특별자치도",
+        충북: "충청북도",
+        충남: "충청남도",
+        전북: "전북특별자치도",
+        전남: "전라남도",
+        경북: "경상북도",
+        경남: "경상남도",
+        제주: "제주특별자치도",
+      };
 
-        const res = await baseApi.get("user/scraps", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          params: {
-            page: 0,
-            size: 10,
-            sort:
-              sortOrder === "좋아요순" ? "likeCount,desc" : "createdAt,desc",
-            ...(tagsQuery && { tags: tagsQuery }),
-            ...(regionQuery && { region: regionQuery }), // tag가 있을 때만 추가
-          },
-        });
+      const regionQuery = region ? regionMap[region] : undefined;
+      // API 엔드포인트 수정 시도
+      // if (selectedTags.length > 0) {
+      //   params.tags = selectedTags.map((t) => t.value).join(","); // AND 조건
+      // }
+      const tagsQuery =
+        selectedTags.length > 0
+          ? selectedTags
+              .map((t) => (typeof t === "string" ? t : t.value))
+              .join(",")
+          : undefined;
 
-        const postsData = res.data.data?.content || [];
+      const params = {
+        page: 0,
+        size: 10,
+        sort: sortOrder === "좋아요순" ? "likeCount,desc" : "createdAt,desc",
+        ...(tagsQuery ? { tags: tagsQuery } : {}),
+        ...(region ? { region: regionMap[region] } : {}),
+      };
 
-        setPosts(postsData);
-      } catch (err) {
-        console.error(
-          "[스크랩북] API 오류:",
-          err.response?.status,
-          err.message
+      const res = await baseApi.get("user/scraps", {
+        headers: { Authorization: `Bearer ${token}` },
+        params,
+      });
+
+      const postsData = res.data.data?.content || [];
+
+      // 좋아요순 정렬 적용
+      let sortedPosts = postsData;
+      if (sortOrder === "좋아요순") {
+        sortedPosts = [...postsData].sort(
+          (a, b) => (b.likeCount || 0) - (a.likeCount || 0)
         );
       }
-    };
 
+      setPosts(sortedPosts);
+    } catch (err) {
+      console.error("[스크랩북] API 오류:", err.response?.status, err.message);
+    }
+  };
+  useEffect(() => {
     fetchScrapedPosts();
   }, [selectedTags, region, sortOrder]);
 

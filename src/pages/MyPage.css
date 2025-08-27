@@ -239,13 +239,25 @@
   cursor: default;
 }
 
+.post-images .sub-image {
+  width: 48%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+}
+.post-images .main-image {
+  width: 48%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+}
 .myp-card.selected {
   border-color: #9a7937;
   box-shadow: 0 2px 8px rgba(154, 121, 55, 0.2);
 }
 
 .myp-card-images {
-  width: 100% !important;
+  width: 50% !important;
   display: flex !important;
   flex-direction: row !important;
   gap: 4px;
@@ -295,7 +307,6 @@
 
 .post-tags {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   gap: 8px;
   margin-top: 0; /* 마진 제거: 2px → 0 */

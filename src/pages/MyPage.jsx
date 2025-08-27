@@ -403,6 +403,30 @@ export default function MyPage() {
     setError(null);
   };
 
+  // 기본 이미지 삭제/초기화용 함수
+  const deleteProfileImage = async () => {
+    const token = sessionStorage.getItem("accessToken");
+
+    try {
+      await baseApi.delete("/user/profile-image", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        data: { profileImageUrl: "/default_profile.png" }, // 서버가 body를 받는다고 가정
+      });
+
+      // 상태 업데이트
+      setUser((prev) => ({ ...prev, profileImageUrl: "/default_profile.png" }));
+      setEditForm((prev) => ({
+        ...prev,
+        profileImageUrl: "/default_profile.png",
+      }));
+    } catch (e) {
+      console.error("기본 이미지 삭제 실패:", e);
+      setError("기본 이미지 적용 중 오류가 발생했습니다.");
+    }
+  };
+
   const closeProfileEdit = () => {
     setEditForm({
       nickname: user?.nickname || "",
@@ -412,94 +436,59 @@ export default function MyPage() {
     setError(null);
     setLoading(false);
   };
-
+  const getDefaultProfileFile = async () => {
+    const response = await fetch("/default_profile.png"); // public 폴더
+    const blob = await response.blob();
+    return new File([blob], "default_profile.png", { type: blob.type });
+  };
   // 프로필 저장
-  const saveProfile = async () => {
+  // 프로필 저장
+  const saveProfileImage = async () => {
     try {
       setLoading(true);
       setError(null);
+      const token = sessionStorage.getItem("accessToken");
 
-      let finalProfileImageUrl = editForm.profileImageUrl;
+      let file;
 
-      // base64 데이터인 경우 (새로 업로드된 이미지)
+      // 기본 이미지 혹은 업로드 이미지 처리
       if (
-        editForm.profileImageUrl &&
-        editForm.profileImageUrl.startsWith("data:image/")
+        !editForm.profileImageUrl ||
+        editForm.profileImageUrl === "/default_profile.png"
       ) {
-        try {
-          const formData = new FormData();
-          const response = await fetch(editForm.profileImageUrl);
-          const blob = await response.blob();
-          formData.append("profileImage", blob, "profile.jpg");
-
-          const uploadResponse = await baseApi.post(
-            "/user/profile-image",
-            formData
-          );
-
-          finalProfileImageUrl =
-            uploadResponse.data?.data?.profileImageUrl ||
-            uploadResponse.data?.profileImageUrl ||
-            uploadResponse.data?.data?.url ||
-            uploadResponse.data?.url ||
-            uploadResponse.data?.imageUrl;
-
-          if (!finalProfileImageUrl) {
-            throw new Error("이미지 업로드 응답에서 URL을 찾을 수 없습니다.");
-          }
-        } catch (uploadError) {
-          console.error("이미지 업로드 실패:", uploadError);
-          setError(`이미지 업로드에 실패했습니다: ${uploadError.message}`);
-          return;
-        }
+        // public/default_profile.png를 File로 변환
+        const response = await fetch("/default_profile.png");
+        const blob = await response.blob();
+        file = new File([blob], "default_profile.png", { type: blob.type });
+      } else if (editForm.profileImageUrl.startsWith("data:image/")) {
+        const blob = await (await fetch(editForm.profileImageUrl)).blob();
+        file = new File([blob], "profile.jpg", { type: blob.type });
       }
 
-      // 즉시 로컬 상태 업데이트
-      const updatedUser = {
-        ...user,
-        nickname: editForm.nickname,
-        profileImageUrl: finalProfileImageUrl,
-      };
-      setUser(updatedUser);
-
-      // 프로필 정보 업데이트
-      const updateData = {
-        nickname: editForm.nickname,
-        profileImageUrl: finalProfileImageUrl,
-      };
-
-      const response = await baseApi.put("/user/me", updateData);
-
-      if (response.data?.success || response.status === 200) {
-        setEditForm({
-          nickname: editForm.nickname,
-          profileImageUrl: finalProfileImageUrl,
-        });
-
-        setIsEditingProfile(false);
-
-        // 사이드바 업데이트를 위한 이벤트 발생
-        window.dispatchEvent(
-          new CustomEvent("userProfileUpdated", {
-            detail: {
-              nickname: editForm.nickname,
-              profileImageUrl: finalProfileImageUrl,
-              user: updatedUser,
-            },
-          })
-        );
-      } else {
-        setUser(user);
-        setError("프로필 업데이트에 실패했습니다.");
+      if (!file) {
+        setError("이미지를 선택해주세요.");
+        return;
       }
+
+      const formData = new FormData();
+      formData.append("profileImage", file);
+
+      await baseApi.post("/user/profile-image", formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      setUser((prev) => ({
+        ...prev,
+        profileImageUrl: editForm.profileImageUrl,
+      }));
+
+      setIsEditingProfile(false);
     } catch (e) {
-      console.error("프로필 업데이트 실패:", e);
-      setUser(user);
-      setError(
-        `프로필 업데이트 중 오류가 발생했습니다: ${
-          e.response?.data?.message || e.message
-        }`
-      );
+      console.error("프로필 저장 실패:", e);
+      setError(e.message || "프로필 저장에 실패했습니다.");
     } finally {
       setLoading(false);
     }
@@ -560,7 +549,7 @@ export default function MyPage() {
       <section className="myp-header">
         <img
           className="myp-avatar-lg"
-          src={user?.profileImageUrl || "./default_profile.png"}
+          src={user?.profileImageUrl || "/default_profile"}
           style={{
             width: "120px",
             height: "120px",
@@ -691,7 +680,7 @@ export default function MyPage() {
                       post.tags.slice(0, 2).map((tag, idx) => (
                         <span key={idx} className="tag" title={`#${tag}`}>
                           #
-                          {tag === "TRAVEL"
+                          {tag === "TRAVEL_SPOT"
                             ? "여행지"
                             : tag === "RESTAURANT"
                             ? "맛집"
@@ -793,13 +782,7 @@ export default function MyPage() {
                     </label>
                     <button
                       type="button"
-                      onClick={() =>
-                        setEditForm((prev) => ({
-                          ...prev,
-                          profileImageUrl:
-                            "https://www.studiopeople.kr/common/img/default_profile.png",
-                        }))
-                      }
+                      onClick={deleteProfileImage}
                       className="myp-default-btn"
                     >
                       기본 이미지
@@ -838,7 +821,7 @@ export default function MyPage() {
                 </button>
                 <button
                   className="myp-save-btn"
-                  onClick={saveProfile}
+                  onClick={saveProfileImage}
                   disabled={loading}
                 >
                   {loading ? "저장 중..." : "저장"}

@@ -4,33 +4,37 @@ import "./PostCard.css";
 import { FaHeart, FaBookmark } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import baseApi from "../../api/baseApi";
+import { RiNextjsFill } from "react-icons/ri";
 
 // ✅ 내 액션(색 유지)을 위한 세션 캐시
-const ACTIONS_KEY = "articleActions"; // { [id]: { isLiked, isScraped, likeCount, scrapCount, ts } }
 
-const readActions = () => {
+const readActions = (userId) => {
+  const key = `articleActions:${userId}`;
   try {
-    return JSON.parse(sessionStorage.getItem(ACTIONS_KEY) || "{}");
+    return JSON.parse(sessionStorage.getItem(key) || "{}");
   } catch {
     return {};
   }
 };
 
-const writeActions = (obj) => {
+const writeActions = (userId, obj) => {
   try {
-    sessionStorage.setItem(ACTIONS_KEY, JSON.stringify(obj));
+    const key = `articleActions:${userId}`;
+    sessionStorage.setItem(key, JSON.stringify(obj));
   } catch {}
 };
 
-const patchArticleCache = (id, patch) => {
-  const map = readActions();
+const patchArticleCache = (userId, id, patch) => {
+  const map = readActions(userId);
   map[String(id)] = { ...(map[String(id)] || {}), ...patch, ts: Date.now() };
-  writeActions(map);
+  writeActions(userId, map);
 };
 
 const PostCard = ({ post, onPatch }) => {
   const navigate = useNavigate();
-
+  const [userId, setUserId] = useState(
+    sessionStorage.getItem("userId") || null
+  );
   // 표시/카운트 상태
   const [liked, setLiked] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
@@ -47,28 +51,36 @@ const PostCard = ({ post, onPatch }) => {
 
   // 👉 props로 1차 동기화 후, 세션 캐시(내 액션)로 최종 오버라이드 → 뒤로가도 색 유지
   useEffect(() => {
-    // 1) props 기준
-    setLiked(likedFromProps);
-    setBookmarked(bookmarkedFromProps);
-    setLikeCount(post.likeCount ?? 0);
-    setBookmarkCount(post.scrapCount ?? 0);
+    const fetchUserActions = async () => {
+      const currentUserId = sessionStorage.getItem("userId");
+      if (!currentUserId) return;
 
-    // 2) 내 액션이 있으면 최종 적용 (색 유지의 핵심)
-    const cached = readActions()[String(post.id)];
-    if (cached) {
-      if (cached.isLiked !== undefined) setLiked(!!cached.isLiked);
-      if (cached.isScraped !== undefined) setBookmarked(!!cached.isScraped);
-      if (typeof cached.likeCount === "number") setLikeCount(cached.likeCount);
-      if (typeof cached.scrapCount === "number")
-        setBookmarkCount(cached.scrapCount);
-    }
-  }, [
-    post.id,
-    likedFromProps,
-    bookmarkedFromProps,
-    post.likeCount,
-    post.scrapCount,
-  ]);
+      setUserId(currentUserId);
+
+      const token = sessionStorage.getItem("accessToken");
+      if (!token) return;
+
+      try {
+        const res = await baseApi.get(`/users/${currentUserId}/actions`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const actions = res.data; // { articleId: { liked, scrapped, likeCount, scrapCount } }
+        const cached =
+          actions[post.id] || readActions(currentUserId)[post.id] || {};
+
+        setLiked(cached.liked ?? post.isLiked ?? false);
+        setBookmarked(cached.scrapped ?? post.isScraped ?? false);
+        setLikeCount(cached.likeCount ?? post.likeCount ?? 0);
+        setBookmarkCount(cached.scrapCount ?? post.scrapCount ?? 0);
+
+        patchArticleCache(currentUserId, post.id, cached);
+      } catch (err) {
+        console.error("사용자 액션 불러오기 실패", err);
+      }
+    };
+
+    fetchUserActions();
+  }, [post.id, post.likeCount, post.scrapCount]);
 
   const handleCardClick = () => navigate(`/post/${post.id}`);
 
@@ -81,10 +93,7 @@ const PostCard = ({ post, onPatch }) => {
   const safeGetToken = () => {
     try {
       if (typeof window !== "undefined") {
-        return (
-          sessionStorage.getItem("accessToken") ||
-          localStorage.getItem("accessToken")
-        );
+        return sessionStorage.getItem("accessToken");
       }
     } catch {}
     return null;
@@ -93,154 +102,90 @@ const PostCard = ({ post, onPatch }) => {
   // 좋아요 토글 (성공 시 세션에 내 상태 저장 → 뒤로가도 유지)
   const toggleLike = async (e) => {
     e.stopPropagation();
-    e.preventDefault();
-
     const token = safeGetToken();
-    if (!token) {
-      alert("로그인이 필요합니다. (좋아요)");
-      return;
-    }
+    if (!token) return alert("로그인이 필요합니다.");
 
     try {
       if (!liked) {
-        await baseApi.post(`/articles/${post.id}/likes`);
+        // 좋아요 추가
+        await baseApi.post(
+          `/articles/${post.id}/likes`,
+          {},
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
         setLiked(true);
-        setLikeCount((v) => {
-          const next = v + 1;
-          patchArticleCache(post.id, { isLiked: true, likeCount: next });
-          return next;
+        setLikeCount((prev) => prev + 1);
+        patchArticleCache(userId, post.id, {
+          liked: true,
+          likeCount: likeCount + 1,
         });
-        onPatch?.(post.id, { isLiked: true, likeCount: (likeCount ?? 0) + 1 });
       } else {
-        await baseApi.delete(`/articles/${post.id}/likes`);
-        setLiked(false);
-        setLikeCount((v) => {
-          const next = Math.max(0, v - 1);
-          patchArticleCache(post.id, { isLiked: false, likeCount: next });
-          return next;
+        // 좋아요 취소
+        await baseApi.delete(`/articles/${post.id}/likes`, {
+          headers: { Authorization: `Bearer ${token}` },
         });
-        onPatch?.(post.id, {
-          isLiked: false,
-          likeCount: Math.max(0, (likeCount ?? 0) - 1),
+        setLiked(false);
+        setLikeCount((prev) => Math.max(0, prev - 1));
+        patchArticleCache(userId, post.id, {
+          liked: false,
+          likeCount: Math.max(0, likeCount - 1),
         });
       }
     } catch (err) {
-      const msg = err.response?.data?.message || "";
-      const status = err.response?.status;
+      console.error("좋아요 서버 저장 실패", err);
+      alert("좋아요 처리 중 오류가 발생했습니다.");
+    }
+  };
 
-      // 서버와 불일치 보정
-      if (!liked && status === 400 && /이미\s*좋아요/i.test(msg)) {
-        try {
-          await baseApi.delete(`/articles/${post.id}/likes`);
-          setLiked(false);
-          setLikeCount((v) => {
-            const next = Math.max(0, v - 1);
-            patchArticleCache(post.id, { isLiked: false, likeCount: next });
-            return next;
+  const toggleBookmark = async (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const token = safeGetToken();
+    if (!token) return alert("로그인이 필요합니다. (스크랩)");
+
+    try {
+      if (!bookmarked) {
+        // 스크랩 추가
+        await baseApi.post(
+          `/articles/${post.id}/scraps`,
+          {},
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        setBookmarked(true);
+        setBookmarkCount((prev) => {
+          const next = prev + 1;
+          patchArticleCache(userId, post.id, {
+            isScraped: true,
+            scrapCount: next,
           });
-          onPatch?.(post.id, { isLiked: false });
-          return;
-        } catch {}
-      }
-      if (liked && status === 400 && /좋아요를\s*누르지\s*않은/i.test(msg)) {
-        setLiked(false);
-        setLikeCount((v) => {
-          const next = Math.max(0, v - 1);
-          patchArticleCache(post.id, { isLiked: false, likeCount: next });
           return next;
         });
-        onPatch?.(post.id, { isLiked: false });
-        return;
+      } else {
+        // 스크랩 취소
+        await baseApi.delete(`/articles/${post.id}/scraps`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setBookmarked(false);
+        setBookmarkCount((prev) => {
+          const next = Math.max(0, prev - 1);
+          patchArticleCache(userId, post.id, {
+            isScraped: false,
+            scrapCount: next,
+          });
+          return next;
+        });
       }
-
-      alert(`좋아요 처리 중 오류가 발생했습니다. ${msg ? `(${msg})` : ""}`);
+    } catch (err) {
+      console.error("스크랩 서버 저장 실패", err);
+      alert("스크랩 처리 중 오류가 발생했습니다.");
     }
   };
 
   // 스크랩 토글 (성공 시 세션에 내 상태 저장 → 뒤로가도 유지)
-  const toggleBookmark = async (e) => {
-    e.stopPropagation();
-    e.preventDefault();
-
-    const token = safeGetToken();
-    if (!token) {
-      alert("로그인이 필요합니다. (스크랩)");
-      return;
-    }
-
-    try {
-      if (!bookmarked) {
-        // 서버별 요구 데이터 차이 대응
-        try {
-          await baseApi.post(
-            `/articles/${post.id}/scraps`,
-            {},
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-              },
-            }
-          );
-        } catch {
-          await baseApi.post(`/articles/${post.id}/scraps`, null, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-        }
-        setBookmarked(true);
-        setBookmarkCount((v) => {
-          const next = v + 1;
-          patchArticleCache(post.id, { isScraped: true, scrapCount: next });
-          return next;
-        });
-        onPatch?.(post.id, {
-          isScraped: true,
-          scrapCount: (bookmarkCount ?? 0) + 1,
-        });
-      } else {
-        await baseApi.delete(`/articles/${post.id}/scraps`);
-        setBookmarked(false);
-        setBookmarkCount((v) => {
-          const next = Math.max(0, v - 1);
-          patchArticleCache(post.id, { isScraped: false, scrapCount: next });
-          return next;
-        });
-        onPatch?.(post.id, {
-          isScraped: false,
-          scrapCount: Math.max(0, (bookmarkCount ?? 0) - 1),
-        });
-      }
-    } catch (err) {
-      const msg = err.response?.data?.message || "";
-      const status = err.response?.status;
-
-      if (!bookmarked && status === 400 && /이미\s*스크랩/i.test(msg)) {
-        try {
-          await baseApi.delete(`/articles/${post.id}/scraps`);
-          setBookmarked(false);
-          setBookmarkCount((v) => {
-            const next = Math.max(0, v - 1);
-            patchArticleCache(post.id, { isScraped: false, scrapCount: next });
-            return next;
-          });
-          onPatch?.(post.id, { isScraped: false });
-          return;
-        } catch {}
-      }
-      if (bookmarked && status === 400 && /스크랩하지\s*않은/i.test(msg)) {
-        setBookmarked(false);
-        setBookmarkCount((v) => {
-          const next = Math.max(0, v - 1);
-          patchArticleCache(post.id, { isScraped: false, scrapCount: next });
-          return next;
-        });
-        onPatch?.(post.id, { isScraped: false });
-        return;
-      }
-
-      alert(`스크랩 처리 중 오류가 발생했습니다. ${msg ? `(${msg})` : ""}`);
-    }
-  };
 
   const tagMap = {
     RESTAURANT: "맛집",
@@ -288,6 +233,77 @@ const PostCard = ({ post, onPatch }) => {
     return String(count ?? 0);
   };
 
+  const handleLikeToggle = async (postId, isLiked) => {
+    const token = sessionStorage.getItem("accessToken");
+    if (!token) {
+      alert("로그인이 필요합니다.");
+      return;
+    }
+
+    try {
+      if (isLiked) {
+        // 좋아요 취소
+        await baseApi.delete(`/api/articles/${postId}/likes`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        // 좋아요 추가
+        await baseApi.post(
+          `/api/articles/${postId}/likes`,
+          {},
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+      }
+
+      // 로컬 상태 업데이트 (id 기준으로 찾아서 바꿈)
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? {
+                ...p,
+                liked: !isLiked,
+                likeCount: isLiked ? p.likeCount - 1 : p.likeCount + 1,
+              }
+            : p
+        )
+      );
+    } catch (err) {
+      console.error("좋아요 토글 실패:", err);
+    }
+  };
+
+  // 스크랩 토글
+  const handleScrapToggle = async (postId, isScrapped) => {
+    const token = sessionStorage.getItem("accessToken");
+    if (!token) {
+      alert("로그인이 필요합니다.");
+      return;
+    }
+
+    try {
+      if (isScrapped) {
+        await baseApi.delete(`/api/articles/${postId}/scraps`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        await baseApi.post(
+          `/api/articles/${postId}/scraps`,
+          {},
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+      }
+
+      setPosts((prev) =>
+        prev.map((p) => (p.id === postId ? { ...p, scrapped: !isScrapped } : p))
+      );
+    } catch (err) {
+      console.error("스크랩 토글 실패:", err);
+    }
+  };
   return (
     <div className="post-card" onClick={handleCardClick}>
       {/* 상단 이미지 섹션 */}

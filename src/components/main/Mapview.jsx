@@ -349,15 +349,18 @@ const Mapview = forwardRef(({ onSelectPlace, mode }, ref) => {
   };
 
   const getColor = (level) => {
+    if (level >= 4) return "#006400"; // 4단계, 진한 녹색
     switch (level) {
+      case 0:
+        return "#e6f2e6"; // 0단계, 연한 녹색
       case 1:
-        return "#FFCCCC";
+        return "#b3d9b3"; // 1단계
       case 2:
-        return "#FF6666";
+        return "#66b266"; // 2단계
       case 3:
-        return "#CC0000";
+        return "#339933"; // 3단계, 원색 녹색
       default:
-        return "#EEEEEE";
+        return "#eeeeee"; // 기본 회색
     }
   };
 
@@ -385,7 +388,7 @@ const Mapview = forwardRef(({ onSelectPlace, mode }, ref) => {
         let detailMode = false;
 
         const stampData = await fetchStampData();
-
+        console.log("stampData:", stampData);
         function clearPolygons() {
           polygons.forEach((poly) => poly.setMap(null));
           polygons = [];
