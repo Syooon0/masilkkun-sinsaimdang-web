@@ -49,7 +49,15 @@ const PostListPage = ({ sortOrder, setSortOrder }) => {
 
       const response = await baseApi.get("/articles", { params });
 
-      const content = response.data?.data?.content || []; // 여기서 content 가져오기
+      let content = response.data?.data?.content || [];
+
+      // 클라이언트에서 좋아요순 정렬
+      if (sortOrder === "좋아요순") {
+        content = [...content].sort(
+          (a, b) => (b.likeCount || 0) - (a.likeCount || 0)
+        );
+      }
+
       setPosts(content);
     } catch (error) {
       console.error("게시글 불러오기 실패:", error);
@@ -60,7 +68,7 @@ const PostListPage = ({ sortOrder, setSortOrder }) => {
 
   useEffect(() => {
     fetchPosts();
-  }, [selectedTags, region]);
+  }, [selectedTags, region, sortOrder]);
 
   return (
     <div className="post-list-page">
